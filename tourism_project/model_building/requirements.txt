@@ -1,0 +1,15 @@
+
+# Data manipulation used during registration, preparation, and training
+pandas==2.2.3
+
+# Preprocessing, pipelines, hyperparameter tuning, and evaluation
+scikit-learn==1.6.1
+
+# XGBoost classifier used by the production training pipeline
+xgboost==3.4.1
+
+# Serialization of the trained end-to-end model pipeline
+joblib==1.6.0
+
+# Experiment tracking used during the automated production training workflow
+mlflow==3.0.1
