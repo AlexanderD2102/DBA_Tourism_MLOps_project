@@ -1,0 +1,15 @@
+
+# Data manipulation
+pandas==2.2.3
+
+# Preprocessing and scikit-learn pipeline used by the serialized model
+scikit-learn==1.6.1
+
+# XGBoost classifier used by the production pipeline
+xgboost==3.4.1
+
+# Loading the serialized production model
+joblib==1.6.0
+
+# Web application framework used by Streamlit Community Cloud
+streamlit==1.43.2
