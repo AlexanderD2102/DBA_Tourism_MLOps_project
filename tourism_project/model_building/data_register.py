@@ -1,3 +1,4 @@
+#Use the project folder name, then the folder where model building code will be stored.
 
 # Import pandas for loading and validating the raw tourism dataset
 import pandas as pd
