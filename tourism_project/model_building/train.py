@@ -1,6 +1,6 @@
 
 # ---------------------------------------------------------------------------
-# Import required libraries
+# Step 7.1 - Import required libraries
 # ---------------------------------------------------------------------------
 
 # Import operating system utilities for paths, folders, and environment variables
@@ -40,7 +40,7 @@ from sklearn.metrics import (
 
 
 # ---------------------------------------------------------------------------
-# 1. Define project paths
+# Step 7.2 - Define project paths
 # ---------------------------------------------------------------------------
 
 # Directory containing the production-safe train/test datasets
@@ -57,42 +57,59 @@ MODEL_PATH = f"{DEPLOYMENT_DIR}/best_model.joblib"
 METRICS_PATH = f"{DEPLOYMENT_DIR}/model_metrics.json"
 
 # Create the deployment directory if it does not already exist
-os.makedirs(DEPLOYMENT_DIR, exist_ok=True)
+os.makedirs(
+    DEPLOYMENT_DIR,
+    exist_ok=True
+)
 
 
 # ---------------------------------------------------------------------------
-# 2. Configure MLflow for the production environment
+# Step 7.3 - Configure MLflow for the production environment
 # ---------------------------------------------------------------------------
 
 # In GitHub Actions, MLflow runs locally on port 5000.
-# The environment variable allows the URI to be changed without modifying code.
+# The environment variable allows the tracking URI to be changed
+# without modifying the production training script.
 MLFLOW_TRACKING_URI = os.getenv(
     "MLFLOW_TRACKING_URI",
     "http://127.0.0.1:5000"
 )
 
 # Use the same experiment name as in the development environment
-# so that the project remains conceptually consistent
 EXPERIMENT_NAME = "Tourism_Package_Purchase_Prediction"
 
 # Configure MLflow to use the local tracking server
-mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+mlflow.set_tracking_uri(
+    MLFLOW_TRACKING_URI
+)
 
 # Create or reuse the project experiment
-mlflow.set_experiment(EXPERIMENT_NAME)
+mlflow.set_experiment(
+    EXPERIMENT_NAME
+)
 
 
 # ---------------------------------------------------------------------------
-# 3. Load the prepared production-safe datasets
+# Step 7.4 - Load the prepared production-safe datasets
 # ---------------------------------------------------------------------------
 
 # Load training and test predictor datasets
-Xtrain = pd.read_csv(f"{PROCESSED_DIR}/Xtrain.csv")
-Xtest = pd.read_csv(f"{PROCESSED_DIR}/Xtest.csv")
+Xtrain = pd.read_csv(
+    f"{PROCESSED_DIR}/Xtrain.csv"
+)
+
+Xtest = pd.read_csv(
+    f"{PROCESSED_DIR}/Xtest.csv"
+)
 
 # Load the corresponding binary target datasets and convert them to Series
-ytrain = pd.read_csv(f"{PROCESSED_DIR}/ytrain.csv").squeeze("columns")
-ytest = pd.read_csv(f"{PROCESSED_DIR}/ytest.csv").squeeze("columns")
+ytrain = pd.read_csv(
+    f"{PROCESSED_DIR}/ytrain.csv"
+).squeeze("columns")
+
+ytest = pd.read_csv(
+    f"{PROCESSED_DIR}/ytest.csv"
+).squeeze("columns")
 
 # Report the loaded dataset dimensions for pipeline traceability
 print("✓ Production-safe datasets loaded successfully.")
@@ -103,7 +120,7 @@ print(f"✓ ytest:  {ytest.shape}")
 
 
 # ---------------------------------------------------------------------------
-# 4. Identify numerical and categorical predictors
+# Step 7.5 - Identify numerical and categorical predictors
 # ---------------------------------------------------------------------------
 
 # Automatically determine numerical predictors from pandas data types
@@ -122,39 +139,57 @@ print(f"✓ Total predictors: {Xtrain.shape[1]}")
 
 
 # ---------------------------------------------------------------------------
-# 5. Calculate class weight
+# Step 7.6 - Calculate class weight
 # ---------------------------------------------------------------------------
 
 # Count negative cases: customers who did not purchase the package
-negative_cases = int((ytrain == 0).sum())
+negative_cases = int(
+    (ytrain == 0).sum()
+)
 
 # Count positive cases: customers who purchased the package
-positive_cases = int((ytrain == 1).sum())
+positive_cases = int(
+    (ytrain == 1).sum()
+)
 
 # Calculate scale_pos_weight to compensate for the class imbalance
-class_weight = negative_cases / positive_cases
+class_weight = (
+    negative_cases / positive_cases
+)
 
-print(f"✓ scale_pos_weight: {class_weight:.3f}")
+print(
+    f"✓ scale_pos_weight: "
+    f"{class_weight:.3f}"
+)
 
 
 # ---------------------------------------------------------------------------
-# 6. Build the preprocessing pipeline
+# Step 7.7 - Build the preprocessing pipeline
 # ---------------------------------------------------------------------------
 
 # Standardize numerical features and one-hot encode categorical variables.
 # handle_unknown="ignore" ensures that inference does not fail if a valid
 # categorical value appears that was not represented in the training subset.
 preprocessor = make_column_transformer(
-    (StandardScaler(), numeric_features),
-    (OneHotEncoder(handle_unknown="ignore"), categorical_features)
+    (
+        StandardScaler(),
+        numeric_features
+    ),
+    (
+        OneHotEncoder(
+            handle_unknown="ignore"
+        ),
+        categorical_features
+    )
 )
 
 
 # ---------------------------------------------------------------------------
-# 7. Define the XGBoost classifier
+# Step 7.8 - Define the XGBoost classifier
 # ---------------------------------------------------------------------------
 
-# Configure the base classifier with class weighting and reproducible settings
+# Configure the base classifier with class weighting
+# and reproducible training settings
 xgb_model = xgb.XGBClassifier(
     objective="binary:logistic",
     eval_metric="logloss",
@@ -166,22 +201,40 @@ xgb_model = xgb.XGBClassifier(
 
 
 # ---------------------------------------------------------------------------
-# 8. Define the hyperparameter search space
+# Step 7.9 - Define the hyperparameter search space
 # ---------------------------------------------------------------------------
 
 # Use the same focused search space validated in the development environment
 param_grid = {
-    "xgbclassifier__n_estimators": [100, 200],
-    "xgbclassifier__max_depth": [3, 5],
-    "xgbclassifier__colsample_bytree": [0.8, 1.0],
-    "xgbclassifier__colsample_bylevel": [0.8, 1.0],
-    "xgbclassifier__learning_rate": [0.05, 0.10],
-    "xgbclassifier__reg_lambda": [1.0, 5.0],
+    "xgbclassifier__n_estimators": [
+        100,
+        200
+    ],
+    "xgbclassifier__max_depth": [
+        3,
+        5
+    ],
+    "xgbclassifier__colsample_bytree": [
+        0.8,
+        1.0
+    ],
+    "xgbclassifier__colsample_bylevel": [
+        0.8,
+        1.0
+    ],
+    "xgbclassifier__learning_rate": [
+        0.05,
+        0.10
+    ],
+    "xgbclassifier__reg_lambda": [
+        1.0,
+        5.0
+    ],
 }
 
 
 # ---------------------------------------------------------------------------
-# 9. Combine preprocessing and classification into one pipeline
+# Step 7.10 - Combine preprocessing and classifier
 # ---------------------------------------------------------------------------
 
 # Saving preprocessing and model together ensures that Streamlit applies
@@ -193,19 +246,45 @@ model_pipeline = make_pipeline(
 
 
 # ---------------------------------------------------------------------------
-# 10. Run hyperparameter tuning and MLflow tracking
+# Step 7.11 - Run hyperparameter tuning and MLflow tracking
 # ---------------------------------------------------------------------------
 
 # Start a parent MLflow run representing the complete production training job
-with mlflow.start_run(run_name="Production_XGBoost_GridSearch"):
+with mlflow.start_run(
+    run_name="Production_XGBoost_GridSearch"
+):
 
     # Record experiment-level configuration
-    mlflow.log_param("model_type", "XGBoost")
-    mlflow.log_param("cv_folds", 5)
-    mlflow.log_param("optimization_metric", "roc_auc")
-    mlflow.log_param("scale_pos_weight", float(class_weight))
-    mlflow.log_param("production_safe_features", True)
-    mlflow.log_param("number_of_predictors", Xtrain.shape[1])
+    mlflow.log_param(
+        "model_type",
+        "XGBoost"
+    )
+
+    mlflow.log_param(
+        "cv_folds",
+        5
+    )
+
+    mlflow.log_param(
+        "optimization_metric",
+        "roc_auc"
+    )
+
+    mlflow.log_param(
+        "scale_pos_weight",
+        float(class_weight)
+    )
+
+    mlflow.log_param(
+        "production_safe_features",
+        True
+    )
+
+    mlflow.log_param(
+        "number_of_predictors",
+        Xtrain.shape[1]
+    )
+
 
     # Configure hyperparameter tuning
     # ROC-AUC is used because the target is substantially imbalanced
@@ -221,32 +300,54 @@ with mlflow.start_run(run_name="Production_XGBoost_GridSearch"):
     )
 
     # Train all candidate configurations using the training dataset only
-    grid_search.fit(Xtrain, ytrain)
+    grid_search.fit(
+        Xtrain,
+        ytrain
+    )
 
     # Retrieve cross-validation results for every tested parameter combination
     results = grid_search.cv_results_
 
+
+    # -----------------------------------------------------------------------
+    # Step 7.12 - Log individual hyperparameter combinations
+    # -----------------------------------------------------------------------
+
     # Log every hyperparameter combination as a nested MLflow run
     # so that individual experiments can be compared later
-    for i in range(len(results["params"])):
+    for i in range(
+        len(results["params"])
+    ):
 
         param_set = results["params"][i]
-        mean_score = results["mean_test_score"][i]
-        std_score = results["std_test_score"][i]
+
+        mean_score = results[
+            "mean_test_score"
+        ][i]
+
+        std_score = results[
+            "std_test_score"
+        ][i]
 
         with mlflow.start_run(
-            run_name=f"Production_Grid_Combination_{i + 1:02d}",
+            run_name=(
+                f"Production_Grid_Combination_{i + 1:02d}"
+            ),
             nested=True
         ):
-            # Log the exact hyperparameter combination
-            mlflow.log_params(param_set)
 
-            # Log mean and variation of the cross-validation ROC-AUC
+            # Log the exact hyperparameter combination
+            mlflow.log_params(
+                param_set
+            )
+
+            # Log mean cross-validation ROC-AUC
             mlflow.log_metric(
                 "mean_cv_roc_auc",
                 float(mean_score)
             )
 
+            # Log variation across validation folds
             mlflow.log_metric(
                 "std_cv_roc_auc",
                 float(std_score)
@@ -254,15 +355,17 @@ with mlflow.start_run(run_name="Production_XGBoost_GridSearch"):
 
 
     # -----------------------------------------------------------------------
-    # 11. Select and evaluate the best model
+    # Step 7.13 - Select and evaluate the best model
     # -----------------------------------------------------------------------
 
-    # Retrieve the automatically refitted model associated with
-    # the highest cross-validation ROC-AUC
+    # Retrieve the automatically refitted model associated
+    # with the highest cross-validation ROC-AUC
     best_model = grid_search.best_estimator_
 
     # Log the selected hyperparameters to the parent run
-    mlflow.log_params(grid_search.best_params_)
+    mlflow.log_params(
+        grid_search.best_params_
+    )
 
     # Log the best cross-validation performance
     mlflow.log_metric(
@@ -278,71 +381,116 @@ with mlflow.start_run(run_name="Production_XGBoost_GridSearch"):
         classification_threshold
     )
 
+
     # Generate purchase probabilities for training and untouched test data
-    y_pred_train_proba = best_model.predict_proba(Xtrain)[:, 1]
-    y_pred_test_proba = best_model.predict_proba(Xtest)[:, 1]
+    y_pred_train_proba = best_model.predict_proba(
+        Xtrain
+    )[:, 1]
+
+    y_pred_test_proba = best_model.predict_proba(
+        Xtest
+    )[:, 1]
 
     # Convert probabilities into binary classifications
     y_pred_train = (
-        y_pred_train_proba >= classification_threshold
+        y_pred_train_proba
+        >= classification_threshold
     ).astype(int)
 
     y_pred_test = (
-        y_pred_test_proba >= classification_threshold
+        y_pred_test_proba
+        >= classification_threshold
     ).astype(int)
 
 
-    # -----------------------------------------------------------------------
-    # 12. Calculate final model metrics
-    # -----------------------------------------------------------------------
-
-    # Evaluate model performance on the training dataset
+    # Calculate training-set metrics
     train_metrics = {
         "accuracy": float(
-            accuracy_score(ytrain, y_pred_train)
+            accuracy_score(
+                ytrain,
+                y_pred_train
+            )
         ),
         "precision": float(
-            precision_score(ytrain, y_pred_train, zero_division=0)
+            precision_score(
+                ytrain,
+                y_pred_train,
+                zero_division=0
+            )
         ),
         "recall": float(
-            recall_score(ytrain, y_pred_train, zero_division=0)
+            recall_score(
+                ytrain,
+                y_pred_train,
+                zero_division=0
+            )
         ),
         "f1": float(
-            f1_score(ytrain, y_pred_train, zero_division=0)
+            f1_score(
+                ytrain,
+                y_pred_train,
+                zero_division=0
+            )
         ),
         "roc_auc": float(
-            roc_auc_score(ytrain, y_pred_train_proba)
+            roc_auc_score(
+                ytrain,
+                y_pred_train_proba
+            )
         ),
     }
 
-    # Evaluate generalization performance on the untouched test dataset
+
+    # Calculate untouched test-set metrics
     test_metrics = {
         "accuracy": float(
-            accuracy_score(ytest, y_pred_test)
+            accuracy_score(
+                ytest,
+                y_pred_test
+            )
         ),
         "precision": float(
-            precision_score(ytest, y_pred_test, zero_division=0)
+            precision_score(
+                ytest,
+                y_pred_test,
+                zero_division=0
+            )
         ),
         "recall": float(
-            recall_score(ytest, y_pred_test, zero_division=0)
+            recall_score(
+                ytest,
+                y_pred_test,
+                zero_division=0
+            )
         ),
         "f1": float(
-            f1_score(ytest, y_pred_test, zero_division=0)
+            f1_score(
+                ytest,
+                y_pred_test,
+                zero_division=0
+            )
         ),
         "roc_auc": float(
-            roc_auc_score(ytest, y_pred_test_proba)
+            roc_auc_score(
+                ytest,
+                y_pred_test_proba
+            )
         ),
     }
+
 
     # Log all training metrics to MLflow
     for metric_name, metric_value in train_metrics.items():
+
         mlflow.log_metric(
             f"train_{metric_name}",
             metric_value
         )
 
+
     # Log all test metrics to MLflow
     for metric_name, metric_value in test_metrics.items():
+
         mlflow.log_metric(
             f"test_{metric_name}",
             metric_value
@@ -350,7 +498,7 @@ with mlflow.start_run(run_name="Production_XGBoost_GridSearch"):
 
 
     # -----------------------------------------------------------------------
-    # 13. Save the deployment artifacts
+    # Step 7.14 - Save deployment artifacts
     # -----------------------------------------------------------------------
 
     # Serialize the COMPLETE pipeline, including preprocessing and XGBoost.
@@ -360,17 +508,35 @@ with mlflow.start_run(run_name="Production_XGBoost_GridSearch"):
         MODEL_PATH
     )
 
-    # Store additional metadata required for transparent deployment
+
+    # Store metadata required for transparent deployment
     model_metadata = {
         "model_type": "XGBoost",
-        "classification_threshold": classification_threshold,
-        "best_cv_roc_auc": float(grid_search.best_score_),
-        "best_parameters": grid_search.best_params_,
-        "training_metrics": train_metrics,
-        "test_metrics": test_metrics,
-        "predictor_columns": Xtrain.columns.tolist(),
-        "numeric_features": numeric_features,
-        "categorical_features": categorical_features,
+
+        "classification_threshold":
+            classification_threshold,
+
+        "best_cv_roc_auc":
+            float(grid_search.best_score_),
+
+        "best_parameters":
+            grid_search.best_params_,
+
+        "training_metrics":
+            train_metrics,
+
+        "test_metrics":
+            test_metrics,
+
+        "predictor_columns":
+            Xtrain.columns.tolist(),
+
+        "numeric_features":
+            numeric_features,
+
+        "categorical_features":
+            categorical_features,
+
         "excluded_features": [
             "CustomerID",
             "DurationOfPitch",
@@ -380,24 +546,28 @@ with mlflow.start_run(run_name="Production_XGBoost_GridSearch"):
         ]
     }
 
+
     # Save metadata next to the trained model
     with open(
         METRICS_PATH,
         "w",
         encoding="utf-8"
     ) as metadata_file:
+
         json.dump(
             model_metadata,
             metadata_file,
             indent=4
         )
 
-    # Log both deployment artifacts to the production MLflow run
+
+    # Log the model artifact to MLflow
     mlflow.log_artifact(
         MODEL_PATH,
         artifact_path="deployment"
     )
 
+    # Log the metadata artifact to MLflow
     mlflow.log_artifact(
         METRICS_PATH,
         artifact_path="deployment"
@@ -405,14 +575,44 @@ with mlflow.start_run(run_name="Production_XGBoost_GridSearch"):
 
 
 # ---------------------------------------------------------------------------
-# 14. Report the production-training result
+# Step 7.15 - Report the production-training result
 # ---------------------------------------------------------------------------
 
-print("\n✓ Production model training completed successfully.")
-print(f"✓ Best CV ROC-AUC: {grid_search.best_score_:.4f}")
-print(f"✓ Test ROC-AUC: {test_metrics['roc_auc']:.4f}")
-print(f"✓ Test Recall: {test_metrics['recall']:.4f}")
-print(f"✓ Test Precision: {test_metrics['precision']:.4f}")
-print(f"✓ Test F1-score: {test_metrics['f1']:.4f}")
-print(f"✓ Model saved to: {MODEL_PATH}")
-print(f"✓ Metadata saved to: {METRICS_PATH}")
+print(
+    "\n✓ Production model training completed successfully."
+)
+
+print(
+    f"✓ Best CV ROC-AUC: "
+    f"{grid_search.best_score_:.4f}"
+)
+
+print(
+    f"✓ Test ROC-AUC: "
+    f"{test_metrics['roc_auc']:.4f}"
+)
+
+print(
+    f"✓ Test Recall: "
+    f"{test_metrics['recall']:.4f}"
+)
+
+print(
+    f"✓ Test Precision: "
+    f"{test_metrics['precision']:.4f}"
+)
+
+print(
+    f"✓ Test F1-score: "
+    f"{test_metrics['f1']:.4f}"
+)
+
+print(
+    f"✓ Model saved to: "
+    f"{MODEL_PATH}"
+)
+
+print(
+    f"✓ Metadata saved to: "
+    f"{METRICS_PATH}"
+)
