@@ -1,42 +1,85 @@
-#Use the project folder name, then the folder where model building code will be stored.
 
 # Import pandas for loading and validating the raw tourism dataset
 import pandas as pd
 
-# Define the project-relative path to the raw dataset
-# Using a relative path is important because the same script will later run
-# automatically inside the GitHub Actions workflow
+
+# ---------------------------------------------------------------------------
+# 1. Define the registered dataset location
+# ---------------------------------------------------------------------------
+
+# Define the project-relative path to the raw tourism dataset
+# Using a relative path is essential because this standalone script will later
+# be executed automatically inside the GitHub Actions workflow
 RAW_PATH = "tourism_project/data/tourism.csv"
 
-# Load the raw tourism dataset from the project data directory
+
+# ---------------------------------------------------------------------------
+# 2. Load the raw dataset
+# ---------------------------------------------------------------------------
+
+# Read the raw tourism dataset from the project data directory
 df = pd.read_csv(RAW_PATH)
 
-# Define all columns that are required for the subsequent ML pipeline
-# The dataset is only considered successfully registered if all required
-# business and target variables are available
+
+# ---------------------------------------------------------------------------
+# 3. Validate the expected dataset schema
+# ---------------------------------------------------------------------------
+
+# Define all business, interaction, and target variables expected in the
+# original tourism dataset before any data preparation is performed
 expected_columns = [
-    "CustomerID", "ProdTaken", "Age", "TypeofContact", "CityTier",
-    "DurationOfPitch", "Occupation", "Gender", "NumberOfPersonVisiting",
-    "NumberOfFollowups", "ProductPitched", "PreferredPropertyStar",
-    "MaritalStatus", "NumberOfTrips", "Passport", "PitchSatisfactionScore",
-    "OwnCar", "NumberOfChildrenVisiting", "Designation", "MonthlyIncome",
+    "CustomerID",
+    "ProdTaken",
+    "Age",
+    "TypeofContact",
+    "CityTier",
+    "DurationOfPitch",
+    "Occupation",
+    "Gender",
+    "NumberOfPersonVisiting",
+    "NumberOfFollowups",
+    "ProductPitched",
+    "PreferredPropertyStar",
+    "MaritalStatus",
+    "NumberOfTrips",
+    "Passport",
+    "PitchSatisfactionScore",
+    "OwnCar",
+    "NumberOfChildrenVisiting",
+    "Designation",
+    "MonthlyIncome",
 ]
 
 # Identify any required columns that are missing from the raw dataset
-missing = [column for column in expected_columns if column not in df.columns]
+missing_columns = [
+    column
+    for column in expected_columns
+    if column not in df.columns
+]
 
-# Stop the pipeline immediately if required columns are missing
-# This prevents later preprocessing or model-training steps from using
-# an incomplete or incorrectly structured dataset
-if missing:
-    raise ValueError(f"Dataset is missing expected columns: {missing}")
+# Stop the pipeline immediately if the expected schema is incomplete
+# This prevents subsequent preparation or training steps from operating on
+# incorrectly structured input data
+if missing_columns:
+    raise ValueError(
+        f"Dataset is missing expected columns: {missing_columns}"
+    )
 
-# Report successful registration and basic dataset information
+
+# ---------------------------------------------------------------------------
+# 4. Report successful data registration
+# ---------------------------------------------------------------------------
+
 print("✓ Dataset registered successfully.")
 print(f"✓ Rows: {df.shape[0]:,}")
 print(f"✓ Columns: {df.shape[1]}")
 
-# Display the target distribution to document the class balance
-# ProdTaken = 0 means no purchase; ProdTaken = 1 means purchase
+# Display the target distribution to document the original class imbalance
+# ProdTaken = 0 means no purchase
+# ProdTaken = 1 means purchase
 print("\nProdTaken class distribution:")
-print(df["ProdTaken"].value_counts().sort_index())
+print(
+    df["ProdTaken"]
+    .value_counts()
+    .sort_index()
+)
