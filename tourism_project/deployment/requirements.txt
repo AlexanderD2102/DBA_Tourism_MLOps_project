@@ -11,5 +11,5 @@ xgboost==3.4.1
 # Loading the serialized production model
 joblib==1.6.0
 
-# Web application framework used by Streamlit Community Cloud
+# Web application framework
 streamlit==1.43.2
